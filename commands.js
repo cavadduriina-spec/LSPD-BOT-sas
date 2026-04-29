@@ -3,8 +3,11 @@ require("dotenv").config();
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { loadDB, saveDB, getAgent, getPerson } = require("./database");
 
+// 🔑 VARIABILI
 const STAFF_ROLE = process.env.STAFF_ROLE;
 const GESTIONE_ROLE = process.env.GESTIONE_ROLE;
+const CLIENT_ID = process.env.CLIENT_ID;
+const GUILD_ID = process.env.GUILD_ID;
 
 function hasRole(member, role) {
     return member.roles.cache.has(role);
