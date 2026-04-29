@@ -3,11 +3,8 @@ require("dotenv").config();
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { loadDB, saveDB, getAgent, getPerson } = require("./database");
 
-// 🔑 VARIABILI
 const STAFF_ROLE = process.env.STAFF_ROLE;
 const GESTIONE_ROLE = process.env.GESTIONE_ROLE;
-const CLIENT_ID = process.env.CLIENT_ID;
-const GUILD_ID = process.env.GUILD_ID;
 
 function hasRole(member, role) {
     return member.roles.cache.has(role);
@@ -29,9 +26,19 @@ function addStats(db, users, type) {
     });
 }
 
+// 🔍 funzione universale per trovare per ID
+function findById(db, type, id) {
+    for (let person of Object.values(db.persons)) {
+        if (person[type]) {
+            const found = person[type].find(x => x.id === id);
+            if (found) return { person, found };
+        }
+    }
+    return null;
+}
+
 module.exports = {
 
-// ================= SLASH =================
 handleSlash: async (interaction) => {
 const db = loadDB();
 
@@ -58,58 +65,6 @@ if (interaction.commandName === "cartellino") {
     return interaction.reply({ embeds: [embed], components: [row] });
 }
 
-// ================= AGGIUNGI ORE =================
-if (interaction.commandName === "aggiungi_ore") {
-    if (!hasRole(interaction.member, GESTIONE_ROLE))
-        return interaction.reply({ content: "❌ No permessi", ephemeral: true });
-
-    const user = interaction.options.getUser("utente");
-    const ore = interaction.options.getNumber("ore");
-
-    const ag = getAgent(db, user.id);
-    ag.ore += ore;
-
-    saveDB(db);
-    return interaction.reply(`✅ Ore aggiunte a ${user.tag}`);
-}
-
-// ================= FORZA STOP =================
-if (interaction.commandName === "forza_stop") {
-    if (!hasRole(interaction.member, GESTIONE_ROLE))
-        return;
-
-    const user = interaction.options.getUser("utente");
-    const ag = getAgent(db, user.id);
-
-    ag.inServizio = false;
-    ag.entrata = null;
-
-    saveDB(db);
-    return interaction.reply("⛔ Servizio terminato forzatamente");
-}
-
-// ================= INFO AGENTE =================
-if (interaction.commandName === "info_agente") {
-    if (!hasRole(interaction.member, GESTIONE_ROLE))
-        return;
-
-    const user = interaction.options.getUser("utente");
-    const ag = getAgent(db, user.id);
-
-    const embed = new EmbedBuilder()
-    .setTitle(`👮 ${user.tag}`)
-    .setDescription(`
-⏱ Ore: ${ag.ore.toFixed(2)}
-🚔 Arresti: ${ag.stats.arresti}
-💸 Multe: ${ag.stats.multe}
-🚗 Sequestri: ${ag.stats.sequestri}
-🔫 PDA: ${ag.stats.pda}
-⚖️ Denunce: ${ag.stats.denunce}
-`);
-
-    return interaction.reply({ embeds: [embed] });
-}
-
 // ================= ARRESTO =================
 if (interaction.commandName === "arresto") {
 
@@ -117,7 +72,9 @@ if (interaction.commandName === "arresto") {
     const cognome = interaction.options.getString("cognome");
     const nascita = interaction.options.getString("nascita");
     const reati = interaction.options.getString("reati");
-    const colleghi = interaction.options.getUsers("colleghi") || [];
+
+    const collega = interaction.options.getUser("colleghi");
+    const colleghi = collega ? [collega] : [];
 
     const p = getPerson(db, key(nome, cognome, nascita));
     const id = newId(db, "arrest");
@@ -143,23 +100,22 @@ if (interaction.commandName === "arresto") {
 
 // ================= EDIT ARRESTO =================
 if (interaction.commandName === "edit_arresto") {
+
     const id = interaction.options.getInteger("id");
-    const nuovo = interaction.options.getString("reati");
+    const reati = interaction.options.getString("reati");
 
-    for (let person of Object.values(db.persons)) {
-        const arresto = person.fedina.find(a => a.id === id);
-        if (arresto) {
-            arresto.reati = nuovo;
-            saveDB(db);
-            return interaction.reply("✅ Arresto modificato");
-        }
-    }
+    const res = findById(db, "fedina", id);
+    if (!res) return interaction.reply("❌ ID non trovato");
 
-    return interaction.reply("❌ ID non trovato");
+    if (reati) res.found.reati = reati;
+
+    saveDB(db);
+    return interaction.reply("✅ Arresto modificato");
 }
 
 // ================= PDA =================
 if (interaction.commandName === "rilascia_pda") {
+
     const nome = interaction.options.getString("nome");
     const cognome = interaction.options.getString("cognome");
     const nascita = interaction.options.getString("nascita");
@@ -173,37 +129,30 @@ if (interaction.commandName === "rilascia_pda") {
     getAgent(db, interaction.user.id).stats.pda++;
 
     saveDB(db);
-    return interaction.reply("🔫 PDA rilasciato");
+    return interaction.reply(`🔫 PDA rilasciato ID: ${id}`);
 }
 
-if (interaction.commandName === "ritira_pda") {
-    const nome = interaction.options.getString("nome");
-    const cognome = interaction.options.getString("cognome");
-    const nascita = interaction.options.getString("nascita");
-
-    const p = getPerson(db, key(nome, cognome, nascita));
-
-    p.pda = null;
-
-    saveDB(db);
-    return interaction.reply("❌ PDA ritirato");
-}
-
+// ================= EDIT PDA =================
 if (interaction.commandName === "edit_pda") {
+
     const id = interaction.options.getInteger("id");
     const scadenza = interaction.options.getString("scadenza");
 
     for (let person of Object.values(db.persons)) {
         if (person.pda && person.pda.id === id) {
-            person.pda.scadenza = scadenza;
+            if (scadenza) person.pda.scadenza = scadenza;
+
             saveDB(db);
             return interaction.reply("✅ PDA modificato");
         }
     }
+
+    return interaction.reply("❌ ID non trovato");
 }
 
 // ================= DENUNCIA =================
 if (interaction.commandName === "denuncia") {
+
     const nome = interaction.options.getString("nome");
     const cognome = interaction.options.getString("cognome");
     const nascita = interaction.options.getString("nascita");
@@ -220,8 +169,24 @@ if (interaction.commandName === "denuncia") {
     return interaction.reply(`⚖️ Denuncia ID: ${id}`);
 }
 
+// ================= EDIT DENUNCIA =================
+if (interaction.commandName === "edit_denuncia") {
+
+    const id = interaction.options.getInteger("id");
+    const reati = interaction.options.getString("reati");
+
+    const res = findById(db, "denunce", id);
+    if (!res) return interaction.reply("❌ ID non trovato");
+
+    if (reati) res.found.reati = reati;
+
+    saveDB(db);
+    return interaction.reply("✅ Denuncia modificata");
+}
+
 // ================= MULTA =================
 if (interaction.commandName === "multa") {
+
     const nome = interaction.options.getString("nome");
     const cognome = interaction.options.getString("cognome");
     const nascita = interaction.options.getString("nascita");
@@ -238,8 +203,24 @@ if (interaction.commandName === "multa") {
     return interaction.reply(`💸 Multa ID: ${id}`);
 }
 
+// ================= EDIT MULTA =================
+if (interaction.commandName === "edit_multa") {
+
+    const id = interaction.options.getInteger("id");
+    const reato = interaction.options.getString("reato");
+
+    const res = findById(db, "multe", id);
+    if (!res) return interaction.reply("❌ ID non trovato");
+
+    if (reato) res.found.reato = reato;
+
+    saveDB(db);
+    return interaction.reply("✅ Multa modificata");
+}
+
 // ================= SEQUESTRO =================
 if (interaction.commandName === "sequestra") {
+
     const nome = interaction.options.getString("nome");
     const cognome = interaction.options.getString("cognome");
     const nascita = interaction.options.getString("nascita");
@@ -256,8 +237,24 @@ if (interaction.commandName === "sequestra") {
     return interaction.reply(`🚗 Sequestro ID: ${id}`);
 }
 
+// ================= EDIT SEQUESTRO =================
+if (interaction.commandName === "edit_sequestro") {
+
+    const id = interaction.options.getInteger("id");
+    const targa = interaction.options.getString("targa");
+
+    const res = findById(db, "sequestri", id);
+    if (!res) return interaction.reply("❌ ID non trovato");
+
+    if (targa) res.found.targa = targa;
+
+    saveDB(db);
+    return interaction.reply("✅ Sequestro modificato");
+}
+
 // ================= PULISCI FEDINA =================
 if (interaction.commandName === "pulisci_fedina") {
+
     if (!hasRole(interaction.member, STAFF_ROLE))
         return interaction.reply({ content: "❌ No permessi", ephemeral: true });
 
