@@ -1,7 +1,12 @@
 {
-  "persone": {},
-  "agenti": {},
-  "arresti": {},
-  "pda": {},
-  "sequestri": {}
+  "agents": {},
+  "persons": {},
+  "globalIds": {
+    "arrest": 0,
+    "pda": 0,
+    "denunce": 0,
+    "multe": 0,
+    "sequestri": 0,
+    "pulizia": 0
+  }
 }

@@ -1,9 +1,13 @@
 {
-  "name": "fdo-bot",
+  "name": "lspd-bot",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
-    "discord.js": "^14.26.3",
-    "dotenv": "^17.4.2"
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5"
   }
 }
